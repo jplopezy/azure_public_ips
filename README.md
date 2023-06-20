@@ -24,7 +24,8 @@ We always welcome improvements, so feel free to contribute!
 
 To use this script, first, make sure you have the Microsoft 'az' CLI installed and you are logged in to your Azure account. If not, you can install it and log in using the following command:
 
-curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+curl -sL https://aka.ms/InstallAzureCLIDeb
+
 az login
 
 Then, enter your credentials when prompted.
