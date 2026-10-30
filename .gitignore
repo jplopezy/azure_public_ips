@@ -1,0 +1,5 @@
+scope-*.json
+scope-candidates.json
+__pycache__/
+.pytest_cache/
+*.py[cod]

@@ -1,38 +1,48 @@
-# Azure Public IP Fetching Script
+# Azure Scope Candidate Inventory
 
-This script was inspired by [aws_public_ips](https://github.com/arkadiyt/aws_public_ips), which fetches all public IPs associated with an AWS account. The idea behind our script is similar - to quickly determine the scope and initiate a scan for pen testing tasks.
+Read-only Azure CLI inventory to help prepare **authorized** penetration-testing scopes. It enumerates candidate ingress addresses and hostnames across explicitly selected subscription/resource groups; it **does not** verify ownership, perform network scans, or prove that any resource is authorized for testing.
 
-Currently, our script supports the most important services in Azure. These include:
+## Improvements in v2
 
-1. **Virtual Machines (VMs)**: The script collects the public IP addresses of all VMs within the specified resource groups.
+- Explicit `--subscription` and repeatable `--resource-group`; **never silently enumerate every subscription**.
+- Retrieves associated public IP resources (not NAT egress-only IPs), App Services / Function Apps hostnames, SQL FQDNs, public Azure Container Instances, and Blob endpoints.
+- Does not mistake App Service `outboundIpAddresses` for public inbound targets.
+- Avoids inventing DNS names or double-appending `.database.windows.net` to SQL FQDNs.
+- JSON output with Azure resource IDs for validation by a scope owner. No activity against returned hosts.
+- Fails if an Azure CLI inventory call fails: a partial result is not treated as complete.
 
-2. **Load Balancers (LBs)**: The script fetches the public IP addresses of all load balancers within the specified resource groups.
+## Requirements
 
-3. **SQL Servers**: The script gathers the Fully Qualified Domain Names (FQDNs) for all SQL servers within the specified resource groups. While these are not IPs, they effectively serve the same purpose of addressing the resource.
-
-4. **Synapse Workspaces SQL Pools**: The script retrieves the server addresses associated with SQL pools within Synapse Workspaces in the specified resource groups.
-
-5. **Containers**: The script collects the public IP addresses of all Azure Container Instances within the specified resource groups.
-
-6. **App Services (Web Apps)**: The script fetches the outbound IP addresses for all web apps within the specified resource groups.
-
-7. **Azure Functions**: The script gathers the outbound IP addresses for all Azure Functions within the specified resource groups.
-
-We always welcome improvements, so feel free to contribute!
+- Python 3.9+ (`az` CLI separately installed, authenticated and permitted to read selected resource groups)
+- Azure access with resource read permissions
 
 ## Usage
 
-To use this script, first, make sure you have the Microsoft 'az' CLI installed and you are logged in to your Azure account. If not, you can install it and log in using the following command:
-
-curl -sL https://aka.ms/InstallAzureCLIDeb
-
+```bash
 az login
+az account list --output table
+python3 azure_scope.py --subscription YOUR-SUBSCRIPTION-ID \
+  --resource-group AUTHORIZED-RG --output scope-2026.json
 
-Then, enter your credentials when prompted.
+# Repeat to include a second specifically approved resource group:
+./azureips.sh --subscription YOUR-SUBSCRIPTION-ID \
+  --resource-group RG-1 --resource-group RG-2 --output scope-review.json
 
-Once you're logged in, all you need to do is execute the 'azureips.sh' script. The output will include the public IPs and relevant addressing data of all the services within your specified Azure resource groups.
+# Restrict API calls if an account lacks access to some resource types:
+python3 azure_scope.py --subscription YOUR-SUBSCRIPTION-ID \
+  --resource-group RG-1 --service public-ip --service webapp --output scope-review.json
+```
 
-./azureips.sh
+Output files are designed for **human review** and include the service, resource name, resource ID, group, candidate host/IP and a review note. Do **not** feed them automatically into Nmap/Nuclei. Azure resources may be shared, restricted by a firewall, or belong to third parties behind custom domains. Confirm contractual authorization and exclusions separately.
 
-This script is an easy and efficient way to get a quick overview of your public-facing Azure resources, helping to speed up pen testing and other security-related tasks.
+No results are written until all selected inventory operations succeed. The script will not overwrite an existing output file.
 
+## Offline tests
+
+```bash
+python3 -m unittest discover -s tests -v
+```
+
+## Limitations
+
+This release intentionally prioritizes accurate basic candidates over exhaustive Azure surface enumeration. It does not cover Front Door, CDN, Private Link, API Management, managed Kubernetes ingress, cross-subscription resources, DNS aliases or custom endpoint ownership verification. A missing candidate is not evidence of a secure or inaccessible resource.
